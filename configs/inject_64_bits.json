@@ -1,0 +1,222 @@
+{
+    "inject": {
+        "task_cfg": {
+            "log_path": "./results/inject_64bits",
+            "running_epoch": 1,
+            "thr_stage1": 0.99,
+            "thr_stage2": 0.045,
+            "thr_stage3": 0.99,
+            "generation_cfg": {
+                "prompts": "./datafiles/coco_val_2017_captions.txt",
+                "num_per_class": 1,
+                "batch_size": 8,
+                "save_path": "./results/inject_64bits/images",
+                "msg_path": "./datafiles/msg_64.npy"
+            },
+            "thr_eval": 0
+        },
+
+        "training_data": {
+            "dataset": {
+                "type": "InjectDataset",
+                "data_json": "./datafiles/LAION5plus_50000.json",
+                "preprocess": {
+                    "rescale": {
+                        "min_size": 512
+                    },
+                    "norm": {
+                        "mean": 0.5,
+                        "std": 0.5
+                    },
+                    "random_crop": {
+                        "target_size": 512
+                    }
+                },
+                "data_aug": {}
+            },
+            "dataloader": {
+                "batch_size": 2,
+                "shuffle": true,
+                "collate_fn": "collate_fn",
+                "num_workers": 0
+            }
+        },
+
+        "generator": {
+            "model": {
+                "type": "stable_diffusion",
+                "kwargs": {
+                    "unet_config": {
+                        "type": "models.generators.stable_diffusion.diffusionmodules.openaimodel.UNetModel",
+                        "params": {
+                            "image_size": 64,
+                            "in_channels": 4,
+                            "out_channels": 4,
+                            "model_channels": 320,
+                            "attention_resolutions": [4,2,1],
+                            "num_res_blocks": 2,
+                            "channel_mult": [1,2,4,4],
+                            "num_heads": 8,
+                            "use_spatial_transformer": true,
+                            "transformer_depth": 1,
+                            "context_dim": 768,
+                            "legacy": false,
+                            "use_fp16": true
+                        }
+                        
+                    },
+                    "first_stage_config": {
+                        "type": "models.generators.stable_diffusion.autoencoder.AutoencoderKL",
+                        "params": {
+                            "use_fp16": true,
+                            "embed_dim": 4,
+                            "ddconfig": {
+                                "double_z": true,
+                                "z_channels": 4,
+                                "resolution": 512,
+                                "in_channels": 3,
+                                "out_ch": 3,
+                                "ch": 128,
+                                "ch_mult": [1,2,4,4],
+                                "num_res_blocks": 2,
+                                "attn_resolutions": [],
+                                "dropout": 0.0
+                            },
+                            "lossconfig": {
+                                "type": "torch.nn.Identity",
+                                "params": {}
+                            }
+                        }
+                        
+                    },
+                    "cond_stage_config": {
+                        "type": "models.generators.stable_diffusion.encoders.modules.FrozenCLIPEmbedder",
+                        "params": {}
+                    },
+                    "num_timesteps_cond": 1,
+                    "image_size": 64,
+                    "channels": 4,
+                    "cond_stage_key":"txt",
+                    "timesteps": 1000,
+                    "cond_stage_trainable": false,
+                    "log_every_t": 200,
+                    "conditioning_key": "crossattn",
+                    "first_stage_key": "image",
+                    "use_fp16": true,
+                    "scale_factor": 0.18215
+                }
+            },
+            "ddim": {
+                "S": 50,
+                "unconditional_guidance_scale": 7.5,
+                "eta": 0.0,
+                "shape": [4, 64, 64]
+            },
+            "device": "cuda:0",
+            "sd_ckpt": "./sd_ckpts/stable_diffusion_v1_4.pth",
+
+            "mix_precision": {
+                "use_fp16": true,
+                "fp16_scale_growth": 1e-3
+            },
+    
+            "optimizer": {
+                "type": "AdamW", 
+                "kwargs": {
+                    "lr": 1e-5,
+                    "weight_decay": 0.0
+                }
+            },
+    
+            "scheduler": {
+                "decay": {
+                    "type": "MultiStepLR",
+                    "kwargs": {
+                        "milestones": [25000]
+                    }
+                }
+            },
+            "pretrain": {
+                "optimizer": {
+                    "type": "AdamW", 
+                    "kwargs": {
+                        "lr": 1e-3,
+                        "weight_decay": 0.0
+                    }
+                },
+                "scheduler": {
+                    "decay": {
+                        "type": "StepLR",
+                        "kwargs": {"step_size": 2000}
+                    }
+                }
+            }
+        },
+
+
+        "message_model": {
+            "model": {
+                "type": "NaiveMessageModel",
+                "kwargs": {
+                    "bit_num": 64,
+                    "enc_dim": 4096,
+                    "latent_dim": 4096,
+                    "mode": "regression"
+                }
+            },
+            "device": "cuda:0",
+            "optimizer": {
+                "type": "AdamW", 
+                "kwargs": {
+                    "lr": 1e-5,
+                    "weight_decay": 0.00
+                }
+            },
+            "scheduler": {
+                "decay": {
+                    "type": "MultiStepLR",
+                    "kwargs": {
+                        "milestones": [12500]
+                    }
+                }
+            },
+            "pretrain": {
+                "optimizer": {
+                    "type": "AdamW", 
+                    "kwargs": {
+                        "lr": 1e-4,
+                        "weight_decay": 0.0
+                    }
+                },
+                "scheduler": {
+                    "decay": {
+                        "type": "StepLR",
+                        "kwargs": {"step_size": 4000}
+                    }
+                }
+            }
+        },
+
+        "loss": {
+            "device": "cuda:0",
+            "recon_lpips_loss": {
+                "scale": 1,
+                "kwargs": {}
+            },
+            "recon_latent_l2_loss": {
+                "scale": 1.5,
+                "kwargs": {}
+            },
+            "msg_bit_loss": {
+                "scale": 2,
+                "kwargs": {
+                    "mode": "regression"
+                }
+            },
+            "msg_lse_loss": {
+                "scale": 1,
+                "kwargs": {}
+            }
+        }
+    }
+}

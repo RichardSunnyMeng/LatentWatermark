@@ -1,0 +1,1 @@
+from .maping_fusing_model import MappingFusingUNet
